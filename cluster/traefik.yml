@@ -24,13 +24,15 @@ spec:
         values: |
           ingressRoute:
             dashboard:
-            enabled: true
-            matchRule: Host(`dashboard.hattmo.com`)
-            entryPoints:
-              - web
+              enabled: true
+              matchRule: Host(`dashboard.hattmo.com`)
+              entryPoints:
+                - web
           providers:
             kubernetesGateway:
               enabled: true
+            kubernetesIngress:
+              enabled: false
           gateway:
             listeners:
               web:

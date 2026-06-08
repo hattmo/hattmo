@@ -20,4 +20,19 @@ spec:
     - chart: traefik
       repoURL: https://traefik.github.io/charts
       targetRevision: v38.0.1
-
+      helm:
+        values: |
+          ingressRoute:
+            dashboard:
+            enabled: true
+            matchRule: Host(`dashboard.hattmo.com`)
+            entryPoints:
+              - web
+          providers:
+            kubernetesGateway:
+              enabled: true
+          gateway:
+            listeners:
+              web:
+                namespacePolicy:
+                  from: All

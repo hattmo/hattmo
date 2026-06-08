@@ -12,6 +12,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb
   sources:
     - chart: metallb
       repoURL: https://metallb.github.io/metallb
@@ -22,6 +26,4 @@ spec:
             prometheus:
               serviceMonitor:
                 enabled: false
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: metallb
+

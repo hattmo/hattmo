@@ -5,8 +5,7 @@ use std::{
 };
 
 fn main() -> io::Result<()> {
-    let command: Vec<String> = std::env::args().collect();
-    let command: Vec<_> = command.iter().map(|i| i.as_str()).collect();
+    let command: Vec<_> = std::env::args_os().map(|i| i.as_os_str()).collect();
     let [_, command @ ..] = command.as_slice() else {
         return Err(io::Error::other("Invalid Arguments"));
     };
@@ -51,7 +50,7 @@ fn main() -> io::Result<()> {
 }
 
 fn run_command(
-    command: &[&str],
+    command: &[&OsStr],
     user: &str,
     host: &str,
     mut out: impl Write,
@@ -80,4 +79,8 @@ fn run_command(
     io::copy(&mut pipe_read, &mut out)?;
     child.wait()?;
     Ok(())
+}
+
+trait SpawnPty {
+    fn spawn_pty();
 }

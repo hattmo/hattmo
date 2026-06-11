@@ -1,5 +1,3 @@
-#![feature(duration_constructors_lite)]
-
 mod byte_format;
 mod cleanup;
 mod setup;

@@ -7,4 +7,5 @@ edition = "2021"
 aes-gcm = { version = "0.10", default-features = false, features = ["aes","arrayvec"] }
 arrayvec = { version = "0.7", default-features = false }
 ed25519-dalek = { version = "2", default-features = false }
+rand_core = "0.6"
 x25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }

@@ -4,9 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio-rustls = "0.26.4"
-bincode = { version = "2.0.1" }
-proto = { path = "../proto/" }
 x509-parser = "0.18.0"
-tokio = { version = "1.52.3", features = ["full"] }
-zbus = "5.12.0"
+tokio = { version = "1", features = ["full"] }

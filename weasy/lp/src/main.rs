@@ -22,26 +22,7 @@ use tokio_rustls::{
 use x509_parser::prelude::*;
 use zbus::{connection, interface};
 
-struct Weasy {
-    store: AgentStore,
-}
 
-#[interface(name = "com.hattmo.Weasy1")]
-impl Weasy {
-    async fn request_open(&self, agent: &str, sess: u64, path: PathBuf) {
-        let agent_ctx = self.store.get_agent_context(agent).await;
-        let seq = agent_ctx.next_seq(sess).await;
-        let req = Request {
-            sess,
-            seq,
-            req: RequestType::Open(Open { path }),
-        };
-        agent_ctx.put_request(req).await;
-    }
-    async fn get_agents(&self) -> Vec<String> {
-        self.store.get_agent_names().await
-    }
-}
 
 #[derive(Default, Clone)]
 struct AgentStore(Arc<Mutex<HashMap<String, AgentContext>>>);

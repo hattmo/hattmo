@@ -2,6 +2,8 @@
 
 extern crate core;
 
+use rand_core::{CryptoRng, RngCore};
+
 use core::convert::TryFrom;
 
 use arrayvec::ArrayVec;
@@ -128,12 +130,16 @@ impl KeyStore {
     }
 }
 
-pub struct Router<'a, const MAX_PACKET: usize> {
+pub struct Router<'a, const MAX_PACKET: usize, T>
+where
+    T: CryptoRng + RngCore,
+{
     id: u64,
     keystore: KeyStore,
     route_table: [Option<Route>; 128],
     links: [Option<(LinkHandle, LinkState)>; 32],
     packet_buffers: &'a mut [[u8; MAX_PACKET]],
+    rng_source: T,
 }
 
 pub enum RouterError {
@@ -148,13 +154,17 @@ impl From<SignatureError> for RouterError {
 
 pub struct CreateLinkError;
 
-impl<'a, 'b, const MAX_PACKET: usize> Router<'a, MAX_PACKET> {
+impl<'a, 'b, const MAX_PACKET: usize, T> Router<'a, MAX_PACKET, T>
+where
+    T: CryptoRng + RngCore,
+{
     pub fn new(
         id: u64,
         key_pair: &'b [u8; 64],
         sig: &'b [u8; 64],
         ca: &'b [u8; 32],
         buffers: &'a mut [u8],
+        rng_source: T,
     ) -> Result<Self, RouterError> {
         let keystore = KeyStore::new(key_pair, sig, ca)?;
         let (_, packet_buffers, _) = unsafe { buffers.align_to_mut::<[u8; MAX_PACKET]>() };
@@ -164,6 +174,7 @@ impl<'a, 'b, const MAX_PACKET: usize> Router<'a, MAX_PACKET> {
             packet_buffers,
             links: [const { Option::None }; 32],
             route_table: [const { Option::None }; 128],
+            rng_source
         })
     }
 
@@ -182,7 +193,7 @@ impl<'a, 'b, const MAX_PACKET: usize> Router<'a, MAX_PACKET> {
     }
 
     pub fn create_link_client(&mut self) -> Result<LinkHandle, CreateLinkError> {
-        let secret: EphemeralSecret = EphemeralSecret::random_from_rng(csprng);
+        let secret: EphemeralSecret = EphemeralSecret::random_from_rng(&mut self.rng_source);
         todo!()
     }
 

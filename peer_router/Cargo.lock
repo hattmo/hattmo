@@ -209,6 +209,7 @@ dependencies = [
  "aes-gcm",
  "arrayvec",
  "ed25519-dalek",
+ "rand_core",
  "x25519-dalek",
 ]
 

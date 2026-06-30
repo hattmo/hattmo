@@ -16,7 +16,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 matrix-sdk = { version = "0.9", default-features = false, features = ["rustls-tls"] }
-matrix-sdk-base = { version = "0.17", default-features = false }
+matrix-sdk-base = { version = "0.18", default-features = false }
 anyhow = "1"
 tokio-util = "0.7.18"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }

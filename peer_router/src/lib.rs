@@ -4,7 +4,7 @@ extern crate core;
 
 use rand_core::{CryptoRng, RngCore};
 
-use core::convert::TryFrom;
+use core::{convert::TryFrom, marker::PhantomData};
 
 use arrayvec::ArrayVec;
 
@@ -19,6 +19,7 @@ use x25519_dalek::{EphemeralSecret, PublicKey};
 enum LinkFrame<'a> {
     Packet(DataPacket<'a>),
     Authentication(AuthenticationPacket<'a>),
+    Control(ControlPacket<'a>),
 }
 enum LinkFrameType {
     Packet,
@@ -61,7 +62,7 @@ impl<'a> LinkFrame<'a> {
                     data,
                 }));
             }
-            _ => {}
+            (LinkFrameType::Authentication, LinkState::Authenticating(secret)) => {}
         }
         Ok(todo!())
     }
@@ -92,8 +93,18 @@ pub struct AuthenticationPacket<'a> {
     dh_sig: &'a Signature,
 }
 
+pub struct ControlPacket<'a> {
+    data: &'a [u8],
+}
+
 #[derive(PartialEq, Eq)]
-pub struct LinkHandle(usize);
+pub struct LinkHandle(u32);
+
+impl From<u32> for LinkHandle {
+    fn from(value: u32) -> Self {
+        LinkHandle(value)
+    }
+}
 
 enum LinkState {
     Authenticating(EphemeralSecret),
@@ -174,7 +185,7 @@ where
             packet_buffers,
             links: [const { Option::None }; 32],
             route_table: [const { Option::None }; 128],
-            rng_source
+            rng_source,
         })
     }
 
@@ -188,12 +199,20 @@ where
             return;
         };
         let Ok(data) = LinkFrame::parse(data, state) else {
-            return;
+            return
         };
     }
 
     pub fn create_link_client(&mut self) -> Result<LinkHandle, CreateLinkError> {
         let secret: EphemeralSecret = EphemeralSecret::random_from_rng(&mut self.rng_source);
+        let state = LinkState::Authenticating(secret);
+        let open = self
+            .links
+            .iter_mut()
+            .find(|i| i.is_none())
+            .ok_or(CreateLinkError)?;
+        let handle: LinkHandle = self.rng_source.next_u32().into();
+        let _ = open.insert((handle, state));
         todo!()
     }
 

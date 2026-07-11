@@ -1,56 +1,94 @@
+use clap::Parser;
 use libc::openpty;
+use ratatui::{DefaultTerminal, Frame};
+use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsStr,
     io::{self, Write},
+    num::NonZero,
+    path::{Path, PathBuf},
     process::Command,
+    sync::{Arc, Mutex},
+    thread::available_parallelism,
 };
 
+#[derive(Serialize, Deserialize)]
+struct Host {
+    host: String,
+}
+
+fn load_config() -> io::Result<Vec<Host>> {
+    let home = std::env::var("HOME").map_err(io::Error::other)?;
+    let config_path: PathBuf = format!("{home}/.config/multi_run").into();
+    std::fs::create_dir_all(&config_path)?;
+    let config_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .read(true)
+        .open(config_path.join(Path::new("hosts.yml")))?;
+
+    let config: Vec<Host> = serde_saphyr::from_reader(config_file).map_err(io::Error::other)?;
+    Ok(config)
+}
+
+#[derive(clap::Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[arg(short, long)]
+    threads: Option<usize>,
+    command: Vec<String>,
+}
+
 fn main() -> io::Result<()> {
-    let command: Vec<_> = std::env::args_os().map(|i| i.as_os_str()).collect();
-    let [_, command @ ..] = command.as_slice() else {
-        return Err(io::Error::other("Invalid Arguments"));
-    };
+    let cli = Cli::parse();
+    let command: &[String] = cli.command.as_slice();
     if command.is_empty() {
         println!("no command to run");
         return Ok(());
     }
+    let config = load_config()?;
+    let threads = cli
+        .threads
+        .or(available_parallelism().ok().map(NonZero::get))
+        .unwrap_or(4);
 
-    let hosts = [
-        "node_0.hattmo.com",
-        "node_1.hattmo.com",
-        "node_2.hattmo.com",
-        "node_3.hattmo.com",
-    ];
-
-    let compiled: String = std::thread::scope(|t| {
-        let mut results = Vec::new();
-        for host in hosts {
-            results.push((
-                host,
-                t.spawn::<_, Result<_, String>>(|| {
-                    let mut out = Vec::new();
-                    run_command(command, "root", host, &mut out).map_err(|e| e.to_string())?;
-                    Ok(out)
-                }),
-            ));
-        }
-        results
-            .into_iter()
-            .map(|(host, result)| {
-                let (Ok(v) | Err(v)) = result
-                    .join()
-                    .or(Err("Failed to join thread".to_owned()))
-                    .flatten()
-                    .map(|res| String::from_utf8_lossy(&res).into_owned());
-                format!("---{host}---\n{v}\n")
-            })
-            .collect()
+    let joined_command = command.join(" ");
+    println!(
+        "Running command: {{{joined_command}}} on {{{}}} hosts with {{{threads}}} threads",
+        config.len()
+    );
+    let (send, recv) = std::sync::mpsc::channel();
+    config.into_iter().for_each(|h| {
+        send.send(h).unwrap();
     });
-    println!("{compiled}");
+    std::thread::scope(move |t| {
+        let recv = Arc::new(Mutex::new(recv));
+        for _ in 0..threads {
+            let recv = recv.clone();
+            t.spawn(move || {
+                while let Ok(v) = recv.lock().unwrap().recv() {
+                    let mut out = Vec::new();
+                    run_command(command, "root", &v.host, &mut out).unwrap();
+                    println!("{out:?}");
+                }
+            });
+        }
+    });
     Ok(())
 }
 
+fn app(terminal: &mut DefaultTerminal) -> io::Result<()> {
+    loop {
+        terminal.draw(render)?;
+    }
+}
+
+fn render(frame: &mut Frame) {
+    frame.render_widget("Hello", frame.area());
+}
+
 fn run_command(
-    command: &[&OsStr],
+    command: &[impl AsRef<OsStr>],
     user: &str,
     host: &str,
     mut out: impl Write,
@@ -70,6 +108,7 @@ fn run_command(
         )
     };
     let (mut pipe_read, pipe_write) = std::io::pipe()?;
+    println!("Running command on {user}@{host}");
     let mut child = Command::new("ssh")
         .arg(format!("{user}@{host}"))
         .args(command)

@@ -17,12 +17,12 @@
 			},
 			"enabled": true,
 			"homeserver": "https://${MATRIX_HOSTNAME}",
-			"userId": "agent_${INDEX}",
-			"password": "${MATRIX_PASSWORD}_${INDEX}",
+			"userId": "${MARTIX_USERNAME}",
+			"password": "${MATRIX_PASSWORD}",
 			"dm": {
 				"policy": "allowlist",
 				"allowFrom": [
-					"@controller:${MATRIX_HOSTNAME}"
+					"@{MATRIX_ADMIN}:${MATRIX_HOSTNAME}"
 				]
 			},
 			"encryption": true,
@@ -51,28 +51,7 @@
 	},
 	"models": {
 		"providers": {
-			"ollama": {
-				"api": "ollama",
-				"apiKey": "ollama-local",
-				"baseUrl": "http://127.0.0.1:11434",
-				"models": [
-					{
-						"id": "qwen3.5:cloud",
-						"input": [
-							"text"
-						],
-						"name": "qwen3.5:cloud",
-					},
-					{
-						"id": "kimi-k2.6:cloud",
-						"input": [
-							"text",
-							"image"
-						],
-						"name": "kimi-k2.6:cloud",
-					}
-				]
-			}
+			
 		}
 	},
 	"plugins": {

@@ -19,7 +19,7 @@
     "express": "^5.1.0",
     "express-fileupload": "^1.2.1",
     "express-json-validator-middleware": "^2.2.1",
-    "morgan": "^1.10.1",
+    "morgan": "^1.11.0",
     "uuid": "^14.0.0"
   },
   "devDependencies": {

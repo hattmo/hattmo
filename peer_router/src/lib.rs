@@ -2,24 +2,16 @@
 
 extern crate core;
 
+use aes_gcm::{AeadInPlace, Aes256Gcm, Nonce, Tag};
+use core::convert::TryFrom;
+use ed25519_dalek::{Signature, SignatureError, SigningKey, Verifier, VerifyingKey};
 use rand_core::{CryptoRng, RngCore};
-
-use core::{convert::TryFrom, marker::PhantomData};
-
-use arrayvec::ArrayVec;
-
-use aes_gcm::{AeadCore, AeadInPlace, Aes256Gcm, Nonce, Tag};
-
-use ed25519_dalek::{
-    ed25519::signature::SignerMut, Signature, SignatureError, SigningKey, Verifier, VerifyingKey,
-};
-
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 enum LinkFrame<'a> {
     Packet(DataPacket<'a>),
     Authentication(AuthenticationPacket<'a>),
-    Control(ControlPacket<'a>),
+    Control(ControlPacket),
 }
 enum LinkFrameType {
     Packet,
@@ -56,34 +48,26 @@ impl<'a> LinkFrame<'a> {
                 let dst = u64::from_le_bytes(dst);
                 let (&mut hops, data) = data.split_first_mut().ok_or("Error")?;
                 return Ok(LinkFrame::Packet(DataPacket {
-                    src,
-                    dst,
+                    src: src.into(),
+                    dst: dst.into(),
                     hops,
                     data,
                 }));
             }
             (LinkFrameType::Authentication, LinkState::Authenticating(secret)) => {}
+            _ => {
+                todo!()
+            }
         }
         Ok(todo!())
     }
 }
 
 pub struct DataPacket<'a> {
-    src: u64,
-    dst: u64,
+    src: NodeId,
+    dst: NodeId,
     hops: u8,
     data: &'a mut [u8],
-}
-
-impl<'a> DataPacket<'a> {
-    fn new(buffer: &'a mut [u8]) -> Self {
-        Self {
-            src: 0,
-            dst: 0,
-            hops: 0,
-            data: buffer,
-        }
-    }
 }
 
 pub struct AuthenticationPacket<'a> {
@@ -93,16 +77,23 @@ pub struct AuthenticationPacket<'a> {
     dh_sig: &'a Signature,
 }
 
-pub struct ControlPacket<'a> {
-    data: &'a [u8],
+pub struct ControlPacket;
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct NodeId(u64);
+
+impl From<u64> for NodeId {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct LinkHandle(u32);
 
 impl From<u32> for LinkHandle {
     fn from(value: u32) -> Self {
-        LinkHandle(value)
+        Self(value)
     }
 }
 
@@ -112,13 +103,13 @@ enum LinkState {
 }
 
 struct Route {
-    to: u64,
-    via: u16,
+    to: NodeId,
+    via: LinkHandle,
     hops: u8,
 }
 
 impl Route {
-    fn new(to: u64, via: u16, hops: u8) -> Self {
+    fn new(to: NodeId, via: LinkHandle, hops: u8) -> Self {
         Self { to, via, hops }
     }
 }
@@ -141,7 +132,7 @@ impl KeyStore {
     }
 }
 
-pub struct Router<'a, const MAX_PACKET: usize, T>
+pub struct Router<T>
 where
     T: CryptoRng + RngCore,
 {
@@ -149,7 +140,6 @@ where
     keystore: KeyStore,
     route_table: [Option<Route>; 128],
     links: [Option<(LinkHandle, LinkState)>; 32],
-    packet_buffers: &'a mut [[u8; MAX_PACKET]],
     rng_source: T,
 }
 
@@ -165,7 +155,14 @@ impl From<SignatureError> for RouterError {
 
 pub struct CreateLinkError;
 
-impl<'a, 'b, const MAX_PACKET: usize, T> Router<'a, MAX_PACKET, T>
+pub struct ProcessError;
+
+pub enum FrameDestination {
+    Local,
+    LinkHandle(LinkHandle),
+}
+
+impl<'a, 'b, T> Router<T>
 where
     T: CryptoRng + RngCore,
 {
@@ -174,33 +171,42 @@ where
         key_pair: &'b [u8; 64],
         sig: &'b [u8; 64],
         ca: &'b [u8; 32],
-        buffers: &'a mut [u8],
         rng_source: T,
     ) -> Result<Self, RouterError> {
         let keystore = KeyStore::new(key_pair, sig, ca)?;
-        let (_, packet_buffers, _) = unsafe { buffers.align_to_mut::<[u8; MAX_PACKET]>() };
         Result::Ok(Self {
             id,
             keystore,
-            packet_buffers,
             links: [const { Option::None }; 32],
             route_table: [const { Option::None }; 128],
             rng_source,
         })
     }
 
-    pub fn process(&mut self, from_link: LinkHandle, data: &mut [u8]) {
-        let Some((_, state)) = self
+    pub fn process_inbound(
+        &mut self,
+        from_link: LinkHandle,
+        data: &'a mut [u8],
+    ) -> Result<(FrameDestination, &'a [u8]), ProcessError> {
+        let (_, state) = self
             .links
             .iter_mut()
             .flatten()
             .find(|(h, _)| h == &from_link)
-        else {
-            return;
-        };
-        let Ok(data) = LinkFrame::parse(data, state) else {
-            return
-        };
+            .ok_or(ProcessError)?;
+        let data = LinkFrame::parse(data, state).or(Err(ProcessError))?;
+        match data {
+            LinkFrame::Packet(data) => {
+                self.update_route_table(&data, from_link);
+                todo!()
+            }
+            LinkFrame::Authentication(authentication_packet) => todo!(),
+            LinkFrame::Control(control_packet) => todo!(),
+        }
+    }
+
+    pub fn process_finish(&mut self) -> (FrameDestination, &[u8]) {
+        todo!()
     }
 
     pub fn create_link_client(&mut self) -> Result<LinkHandle, CreateLinkError> {
@@ -217,6 +223,33 @@ where
     }
 
     pub fn destroy_interface(link: LinkHandle) {
+        todo!()
+    }
+
+    fn update_route_table(
+        &mut self,
+        DataPacket {
+            src,
+            dst,
+            hops,
+            data,
+        }: &DataPacket,
+        from_link: LinkHandle,
+        time: Instant
+    ) {
+        if let Some(route) = self.route_table.iter_mut().flatten().find(|i| &i.to == src) {
+            if route.hops > *hops {
+                route.via = from_link;
+                route.hops = *hops;
+            }
+        }else {
+            if let Some(free) = self.route_table.iter_mut().find(|i|Option::is_none(i)) {
+                let _ = free.insert(Route::new(*src, from_link, *hops));
+
+            };
+        }
+
+
         todo!()
     }
 }

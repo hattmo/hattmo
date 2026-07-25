@@ -4,12 +4,14 @@ extern crate core;
 
 use aes_gcm::Aes256Gcm;
 use ed25519_dalek::SignatureError;
-use rand_core::{CryptoRng, RngCore};
 use x25519_dalek::EphemeralSecret;
 
-use crate::{key_store::KeyStore, link_frame::{DataPacket, LinkFrame}};
+use rand_core::{CryptoRng, RngCore};
 
-mod link_frame;
+use key_store::KeyStore;
+use link::{LinkHandle,LinkFrame};
+
+mod link;
 mod key_store;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -19,20 +21,6 @@ impl From<u64> for NodeId {
     fn from(value: u64) -> Self {
         Self(value)
     }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub struct LinkHandle(u32);
-
-impl From<u32> for LinkHandle {
-    fn from(value: u32) -> Self {
-        Self(value)
-    }
-}
-
-enum LinkState {
-    Authenticating(EphemeralSecret),
-    Up(Aes256Gcm),
 }
 
 struct Route {
@@ -55,7 +43,7 @@ where
     id: u64,
     keystore: KeyStore,
     route_table: [Option<Route>; 128],
-    links: [Option<(LinkHandle, LinkState)>; 32],
+    links: [Option<(LinkHandle, Link)>; 32],
     rng_source: T,
 }
 
@@ -110,9 +98,9 @@ where
             .flatten()
             .find(|(h, _)| h == &from_link)
             .ok_or(ProcessError)?;
-        let data = LinkFrame::parse(data, state).or(Err(ProcessError))?;
+        let data = LinkFrame::process(data, state).or(Err(ProcessError))?;
         match data {
-            LinkFrame::Packet(data) => {
+            LinkFrame::Data(data) => {
                 self.update_route_table(&data, from_link);
                 todo!()
             }
@@ -144,14 +132,13 @@ where
 
     fn update_route_table(
         &mut self,
-        DataPacket {
+        DataFrame {
             src,
             dst,
             hops,
             data,
-        }: &DataPacket,
+        }: &DataFrame,
         from_link: LinkHandle,
-        time: Instant,
     ) {
         if let Some(route) = self.route_table.iter_mut().flatten().find(|i| &i.to == src) {
             if route.hops > *hops {

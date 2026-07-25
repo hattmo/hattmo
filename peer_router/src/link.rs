@@ -3,6 +3,8 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use rand_core::{CryptoRng, RngCore};
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
+use crate::key_store::KeyStore;
+
 use super::NodeId;
 
 use core::convert::TryFrom;
@@ -31,7 +33,7 @@ impl TryFrom<u8> for LinkFrameType {
     }
 }
 
-struct Link<'ca> {
+pub struct Link<'ca> {
     state: LinkState,
     ca: &'ca VerifyingKey
 }
@@ -82,26 +84,12 @@ impl<'ca> Link<'ca> {
 
             // || DH_Key
             (LinkFrameType::Authentication, LinkState::Authenticating(dh_secret)) => {
-                let (key_sig, data) = data.split_at(32);
-                let (verifying_key, data) = data.split_at(32);
-                let (dh_sig, data) = data.split_at(32);
-                let (dh_pub, _) = data.split_at(32);
-
-                let key_sig = Signature::try_from(key_sig).unwrap();
-                self.ca.verify(verifying_key, &key_sig).unwrap();
-
-                let verifying_key = VerifyingKey::try_from(verifying_key).unwrap();
-                let dh_sig = Signature::try_from(dh_sig).unwrap();
-                verifying_key.verify(dh_pub, &dh_sig).unwrap();
-
-
-                let dh_pub: [u8; 32] = dh_pub.try_into().unwrap();
+                let data = KeyStore::verify(data, self.ca).or(Err("Invalid Auth Data"))?;
+                let dh_pub: [u8; 32] = data.try_into().unwrap();
                 let dh_pub = PublicKey::try_from(dh_pub).unwrap();
-
                 let dh_secret = dh_secret.take().unwrap();
                 let shared_secret = dh_secret.diffie_hellman(&dh_pub).to_bytes();
                 let symetric_key = Aes256Gcm::new(&shared_secret.into());
-
                 self.state = LinkState::Up(symetric_key);
                 Ok(None)
             }

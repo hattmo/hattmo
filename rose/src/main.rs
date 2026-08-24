@@ -14,15 +14,8 @@ mod fft;
 mod kvm;
 
 use libc::{user_regs_struct, SYS_ioctl, SYS_openat};
-use opentelemetry::{trace::TracerProvider as _, KeyValue};
-use opentelemetry_sdk::{
-    resource::{
-        EnvResourceDetector, OsResourceDetector, ProcessResourceDetector,
-        SdkProvidedResourceDetector, TelemetryResourceDetector,
-    },
-    trace::{config, TracerProvider},
-    Resource,
-};
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_sdk::{resource::Resource, trace::SdkTracerProvider};
 use rose::{
     GetMapsError, MemoryProcError, RestartCommand, SignalInject, SpawnTracedError, TracedCommand,
     TracedEvent, TracedExitStatus, TracedProcessHandle, WaitEventsError,
@@ -37,36 +30,26 @@ use std::{
     time::Duration,
 };
 use tracing::{info, info_span, instrument, level_filters::LevelFilter, subscriber};
+use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, Registry};
+
+fn build_resource() -> Resource {
+    Resource::builder().with_service_name("ROSE").build()
+}
 
 #[allow(clippy::missing_panics_doc)]
 pub fn main() {
-    let span_exporter = opentelemetry_otlp::new_exporter()
-        .http()
-        .build_span_exporter()
+    let span_exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .build()
         .unwrap();
-    let config = config().with_resource(
-        Resource::from_detectors(
-            Duration::from_secs(5),
-            vec![
-                Box::new(EnvResourceDetector::new()),
-                Box::new(OsResourceDetector),
-                Box::new(ProcessResourceDetector),
-                Box::new(SdkProvidedResourceDetector),
-                Box::new(TelemetryResourceDetector),
-            ],
-        )
-        .merge(&Resource::new([KeyValue {
-            key: "service.name".into(),
-            value: "ROSE".into(),
-        }])),
-    );
-    let provider = TracerProvider::builder()
-        .with_config(config)
+
+    let provider = SdkTracerProvider::builder()
         .with_simple_exporter(span_exporter)
+        .with_resource(build_resource())
         .build();
     let tracer = provider.tracer(env!("CARGO_PKG_NAME"));
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+    let telemetry = OpenTelemetryLayer::new(tracer);
     let reg = Registry::default().with(telemetry).with(LevelFilter::INFO);
     if subscriber::set_global_default(reg).is_err() {
         eprint!("Could not set the global trace subscriber");
@@ -76,6 +59,7 @@ pub fn main() {
         eprintln!("{error:?}");
     };
 }
+
 #[allow(unused)]
 #[derive(Debug)]
 enum JobError {

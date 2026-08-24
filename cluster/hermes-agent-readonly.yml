@@ -1,0 +1,70 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hermes-agent-readonly
+  labels:
+    app: hermes-agent
+    role: readonly
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - services
+      - endpoints
+      - configmaps
+      - namespaces
+      - nodes
+      - events
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - statefulsets
+      - daemonsets
+      - replicasets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - applications
+      - appprojects
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - persistentvolumes
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hermes-agent-readonly
+  namespace: kube-system
+  labels:
+    app: hermes-agent
+    role: readonly
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hermes-agent-readonly
+  labels:
+    app: hermes-agent
+    role: readonly
+subjects:
+  - kind: ServiceAccount
+    name: hermes-agent-readonly
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: hermes-agent-readonly
+  apiGroup: rbac.authorization.k8s.io

@@ -11,13 +11,13 @@ codegen-units = 1
 
 [dependencies]
 libc = "0.2.153"
-opentelemetry = "0.22.0"
-opentelemetry-otlp = { version = "0.15.0", features = ["http-proto", "reqwest-blocking-client"] }
+opentelemetry = "0.32.0"
+opentelemetry-otlp = { version = "0.32.0", features = ["http-proto", "reqwest-blocking-client", "trace"] }
 opentelemetry_sdk = "0.32.1"
 rand = "0.10.1"
 rustfft = "6.2.0"
 textplots = "0.8.6"
 tracing = "0.1.40"
-tracing-opentelemetry = "0.23.0"
+tracing-opentelemetry = "0.33.0"
 tracing-subscriber = "0.3.23"
 

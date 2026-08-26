@@ -1,10 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: hermes-agent
-  labels:
-    app: hermes-agent
-    role: readonly
+  name: readonly
 rules:
   - apiGroups: [""]
     resources:
@@ -43,28 +40,15 @@ rules:
     verbs: ["get", "list", "watch"]
 
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: hermes-agent
-  namespace: kube-system
-  labels:
-    app: hermes-agent
-    role: readonly
-
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: hermes-agent
-  labels:
-    app: hermes-agent
-    role: readonly
 subjects:
-  - kind: ServiceAccount
+  - kind: User
     name: hermes-agent
-    namespace: kube-system
+    apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: hermes-agent
+  name: readonly
   apiGroup: rbac.authorization.k8s.io

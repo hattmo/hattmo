@@ -32,7 +32,7 @@ metadata:
   namespace: longhorn-system
 spec:
   parentRefs:
-    - name: traefik-gateway
+    - name: traefik
       namespace: traefik
       sectionName: websecure
   hostnames:

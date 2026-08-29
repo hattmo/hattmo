@@ -30,7 +30,7 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: eg1
+  name: public
 spec:
   gatewayClassName: eg
   listeners:
@@ -41,7 +41,7 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: eg2
+  name: private
 spec:
   gatewayClassName: eg
   listeners:

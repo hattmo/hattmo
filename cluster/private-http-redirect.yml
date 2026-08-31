@@ -1,0 +1,23 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-http-to-https
+  namespace: default
+spec:
+  parentRefs:
+    - name: private
+      namespace: default
+      sectionName: http
+  hostnames:
+    - longhorn.hattmo.com
+    - argo.hattmo.com
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

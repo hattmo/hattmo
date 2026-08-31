@@ -54,9 +54,25 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: longhorn-selfsigned-tls
+          - name: selfsigned-tls
             kind: Secret
             group: ""
       allowedRoutes:
         namespaces:
           from: All
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: selfsigned-cert
+  namespace: default
+spec:
+  commonName: hattmo.com
+  dnsNames:
+    - longhorn.hattmo.com
+    - argocd.hattmo.com
+  secretName: selfsigned-tls
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io

@@ -22,3 +22,25 @@ spec:
     automated:
       prune: true
       selfHeal: true
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: longhorn-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: longhorn-selfsigned-cert
+  namespace: default
+spec:
+  commonName: longhorn.hattmo.com
+  dnsNames:
+    - longhorn.hattmo.com
+  secretName: longhorn-selfsigned-tls
+  issuerRef:
+    name: longhorn-selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io

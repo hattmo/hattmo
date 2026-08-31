@@ -33,6 +33,7 @@ metadata:
 spec:
   parentRefs:
     - name: private
+      sectionName: https
       namespace: default
   hostnames:
     - longhorn.hattmo.com
@@ -45,3 +46,18 @@ spec:
         - name: longhorn-frontend
           namespace: longhorn-system
           port: 80
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: longhorn-selfsigned-cert
+  namespace: default
+spec:
+  commonName: longhorn.hattmo.com
+  dnsNames:
+    - longhorn.hattmo.com
+  secretName: longhorn-selfsigned-tls
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io

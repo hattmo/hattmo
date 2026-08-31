@@ -26,4 +26,21 @@ spec:
             prometheus:
               serviceMonitor:
                 enabled: false
-
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: service-pool
+  namespace: metallb
+spec:
+  addresses:
+  - 172.30.0.30-172.30.0.39
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2advertisement
+  namespace: metallb
+spec:
+  ipAddressPools:
+  - service-pool

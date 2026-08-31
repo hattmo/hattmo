@@ -12,6 +12,15 @@ use axum::{
 use time::macros::format_description;
 use tokio::sync::Mutex;
 
+fn escape_html(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
 pub async fn web_job(
     results: &'static Mutex<VecDeque<TestResult>>,
     listener: GenericListener,
@@ -94,15 +103,18 @@ async fn root(
                 let time = time
                     .format(format_description!("[hour]:[minute]"))
                     .unwrap_or_else(|_| "00:00".to_string());
-                let tds = format!("<td>{time}</td><td>{addr}</td>") + &marks;
+                let escaped_addr = escape_html(&addr.to_string());
+                let escaped_log = escape_html(log);
+                let tds = format!("<td>{time}</td><td>{escaped_addr}</td>") + &marks;
                 format!(
                     "<tr>{tds}<td><a href=\"#{i}\">\u{2795}</a><a href=\"#\">\u{2796}</a></td></tr>
-                    <tr id=\"{i}\" class=\"expandable\"><td colspan=13><pre>{log}</pre></td></tr>"
+                    <tr id=\"{i}\" class=\"expandable\"><td colspan=13><pre>{escaped_log}</pre></td></tr>"
                 )
             },
         )
         .collect();
 
+    let escaped_c2_port = escape_html(c2_port);
     Html(format!(
         "<html>
             <head>
@@ -124,7 +136,7 @@ a {{
             </head>
             <body>
                 <h1>ACME TEST SERVER</h1>
-                {c2_port}
+                {escaped_c2_port}
                 {TABLE_HEAD}
                 {rows}
                 {TABLE_TAIL}

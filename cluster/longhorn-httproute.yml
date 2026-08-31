@@ -5,7 +5,7 @@ metadata:
   namespace: longhorn-system
 spec:
   parentRefs:
-    - name: public
+    - name: private
       namespace: default
   hostnames:
     - longhorn.hattmo.com

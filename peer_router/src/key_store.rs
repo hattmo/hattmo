@@ -36,26 +36,37 @@ impl KeyStore {
         Ok(Self { key_pair, ca, sig })
     }
 
-    pub fn sign<'a>(&self, data: &[u8], out: &'a mut [u8; SIGNED_DATA_HEADER_SIZE]) {
+    pub fn sign<'a,'b>(&self, data: &'a [u8], sig: &'b mut [u8; SIGNED_DATA_HEADER_SIZE]) {
         let key_sig = self.sig.to_bytes();
         let verify_key = self.key_pair.verifying_key().to_bytes();
         let data_sig = self.key_pair.sign(data).to_bytes();
-        out[..VERIFY_KEY_OFFSET].copy_from_slice(&key_sig);
-        out[VERIFY_KEY_OFFSET..DATA_SIG_OFFSET].copy_from_slice(&verify_key);
-        out[DATA_SIG_OFFSET..].copy_from_slice(&data_sig);
+        sig[..VERIFY_KEY_OFFSET].copy_from_slice(&key_sig);
+        sig[VERIFY_KEY_OFFSET..DATA_SIG_OFFSET].copy_from_slice(&verify_key);
+        sig[DATA_SIG_OFFSET..].copy_from_slice(&data_sig);
     }
 
-    pub fn verify<'a>(data: &'a [u8], ca: &VerifyingKey) -> Result<&'a [u8], KeyStoreError> {
-        let (key_sig, data) = data.split_at_checked(SIGNATURE_SIZE).ok_or(KeyStoreError::MalformedDataHeader)?;
-        let (verifying_key, data) = data.split_at_checked(VERIFY_KEY_SIZE).ok_or(KeyStoreError::MalformedDataHeader)?;
-        let (data_sig, data) = data.split_at_checked(SIGNATURE_SIZE).ok_or(KeyStoreError::MalformedDataHeader)?;
+    pub fn verify<'a, 'b>(&self, data: &'a [u8], sig: &'b [u8; SIGNED_DATA_HEADER_SIZE]) -> Result<(), KeyStoreError> {
+        let (key_sig, sig) = sig.split_at(SIGNATURE_SIZE);
+        let (verifying_key, data_sig) = sig.split_at(VERIFY_KEY_SIZE);
 
         let key_sig = Signature::try_from(key_sig).or(Err(KeyStoreError::MalformedDataHeader))?;
-        ca.verify(verifying_key, &key_sig).or(Err(KeyStoreError::VerifyError))?;
+        self.ca.verify(verifying_key, &key_sig).or(Err(KeyStoreError::VerifyError))?;
 
         let verifying_key = VerifyingKey::try_from(verifying_key).or(Err(KeyStoreError::MalformedDataHeader))?;
         let data_sig = Signature::try_from(data_sig).or(Err(KeyStoreError::MalformedDataHeader))?;
         verifying_key.verify(data, &data_sig).or(Err(KeyStoreError::VerifyError))?;
-        Ok(data)
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use ed25519_dalek::{SigningKey,Signer};
+
+use super::*;
+    #[test]
+    fn test_sign_and_verify(){
+        SigningKey::generate();
+        let ks = KeyStore::new(key_pair, sig, ca);
     }
 }

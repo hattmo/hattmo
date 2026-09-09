@@ -7,7 +7,10 @@ use crate::key_store::KeyStore;
 
 use super::NodeId;
 
-use core::convert::TryFrom;
+use core::{
+    convert::TryFrom,
+    ops::{Deref, DerefMut},
+};
 
 pub struct LinkFrame<'a> {
     pub src: NodeId,
@@ -33,9 +36,9 @@ impl TryFrom<u8> for LinkFrameType {
     }
 }
 
-pub struct Link<'ca> {
+pub struct Link<'a> {
     state: LinkState,
-    ca: &'ca VerifyingKey
+    ca: &'a KeyStore,
 }
 
 pub enum LinkState {
@@ -43,10 +46,10 @@ pub enum LinkState {
     Up(Aes256Gcm),
 }
 
-impl<'ca> Link<'ca> {
-    pub fn new<T>(rng: T, ca: &'ca VerifyingKey) -> Self
+impl<'ks> Link<'ks> {
+    pub fn new<'rng, T>(rng: &'rng mut T, ca: &'ks KeyStore) -> Self
     where
-        T: RngCore + CryptoRng,
+        T: CryptoRng + ?Sized,
     {
         Self {
             ca,
@@ -84,7 +87,8 @@ impl<'ca> Link<'ca> {
 
             // || DH_Key
             (LinkFrameType::Authentication, LinkState::Authenticating(dh_secret)) => {
-                let data = KeyStore::verify(data, self.ca).or(Err("Invalid Auth Data"))?;
+
+                let data = KeyStore::verify(data).or(Err("Invalid Auth Data"))?;
                 let dh_pub: [u8; 32] = data.try_into().unwrap();
                 let dh_pub = PublicKey::try_from(dh_pub).unwrap();
                 let dh_secret = dh_secret.take().unwrap();

@@ -1,22 +1,18 @@
-use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit, Nonce, Tag};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use rand_core::{CryptoRng, RngCore};
-use x25519_dalek::{EphemeralSecret, PublicKey};
+use aes_gcm::{AeadInOut, Aes256Gcm, KeyInit, Nonce, Tag, aead::consts::U12, aes::cipher::InOutBuf};
+use x25519_dalek::{rand_core::CryptoRng, PublicKey, ReusableSecret};
 
-use crate::key_store::KeyStore;
-
-use super::NodeId;
-
-use core::{
-    convert::TryFrom,
-    ops::{Deref, DerefMut},
+use crate::{
+    key_store::{KeyStore, SIGNED_DATA_HEADER_SIZE},
+    NodeId,
 };
+
+use core::convert::TryFrom;
 
 pub struct LinkFrame<'a> {
     pub src: NodeId,
     pub dst: NodeId,
     pub hops: u8,
-    pub data: &'a mut [u8],
+    buf: &'a mut [u8],
 }
 
 pub enum LinkFrameType {
@@ -38,60 +34,62 @@ impl TryFrom<u8> for LinkFrameType {
 
 pub struct Link<'a> {
     state: LinkState,
-    ca: &'a KeyStore,
+    key_store: &'a KeyStore,
 }
 
 pub enum LinkState {
-    Authenticating(Option<EphemeralSecret>),
+    Authenticating(ReusableSecret),
     Up(Aes256Gcm),
 }
 
 impl<'ks> Link<'ks> {
-    pub fn new<'rng, T>(rng: &'rng mut T, ca: &'ks KeyStore) -> Self
+    pub fn new<'rng, T>(rng: &'rng mut T, key_store: &'ks KeyStore) -> Self
     where
         T: CryptoRng + ?Sized,
     {
         Self {
-            ca,
-            state: LinkState::Authenticating(Some(EphemeralSecret::random_from_rng(rng))),
+            key_store,
+            state: LinkState::Authenticating(ReusableSecret::random_from_rng(rng)),
         }
     }
 
     pub fn recieve<'a>(
         &mut self,
-        data: &'a mut [u8],
+        buf: &'a mut [u8],
     ) -> Result<Option<LinkFrame<'a>>, &'static str> {
-        let (&mut ty, data) = data.split_first_mut().ok_or("Error")?;
+        let (&mut ty, rest) = buf.split_first_mut().ok_or("Error")?;
         let ty = LinkFrameType::try_from(ty)?;
         match (ty, &mut self.state) {
             (LinkFrameType::Data, LinkState::Up(symetric_key)) => {
-                let (nonce, data) = data.split_at_mut_checked(12).ok_or("Error")?;
-                let (tag, data) = data.split_at_mut_checked(16).ok_or("Error")?;
+                let (nonce, rest) = rest.split_first_chunk::<12>().ok_or("Error")?;
+                let (tag, rest) = rest.split_at_mut_checked(16).ok_or("Error")?;
 
-                let nonce = Nonce::from_slice(nonce);
-                let tag = Tag::from_slice(tag);
-                symetric_key.decrypt_in_place_detached(nonce, Default::default(), data, tag);
+                let nonce: Nonce<U12> = nonce.into();
+                let tag: Tag = tag.try_into().unwrap();
+                let data: InOutBuf<u8> = rest.into();
+                symetric_key.decrypt_inout_detached(&nonce, Default::default(), data, &tag);
 
-                let (&mut src, data) = data.split_first_chunk_mut().ok_or("Error")?;
+                let (&mut src, rest) = rest.split_first_chunk_mut().ok_or("Error")?;
                 let src = u64::from_le_bytes(src);
-                let (&mut dst, data) = data.split_first_chunk_mut().ok_or("Error")?;
+                let (&mut dst, rest) = rest.split_first_chunk_mut().ok_or("Error")?;
                 let dst = u64::from_le_bytes(dst);
-                let (&mut hops, data) = data.split_first_mut().ok_or("Error")?;
+                let (&mut hops, _) = rest.split_first_mut().ok_or("Error")?;
                 Ok(Some(LinkFrame {
                     src: src.into(),
                     dst: dst.into(),
                     hops,
-                    data,
+                    buf ,
                 }))
             }
 
             // || DH_Key
             (LinkFrameType::Authentication, LinkState::Authenticating(dh_secret)) => {
-
-                let data = KeyStore::verify(data).or(Err("Invalid Auth Data"))?;
+                let (sig, data) = rest.split_at_checked(SIGNED_DATA_HEADER_SIZE).unwrap();
+                self.key_store
+                    .verify(data, sig.try_into().unwrap())
+                    .or(Err("Invalid Auth Data"))?;
                 let dh_pub: [u8; 32] = data.try_into().unwrap();
                 let dh_pub = PublicKey::try_from(dh_pub).unwrap();
-                let dh_secret = dh_secret.take().unwrap();
                 let shared_secret = dh_secret.diffie_hellman(&dh_pub).to_bytes();
                 let symetric_key = Aes256Gcm::new(&shared_secret.into());
                 self.state = LinkState::Up(symetric_key);
@@ -101,6 +99,54 @@ impl<'ks> Link<'ks> {
                 todo!()
             }
         }
+    }
+    pub fn get_sender(&mut self) -> SendState {
+        match &mut self.state {
+            LinkState::Authenticating(reusable_secret) => SendState::Authenticating(AuthSender {
+                secret: reusable_secret,
+                key_store: self.key_store,
+            }),
+            LinkState::Up(aes_gcm) => SendState::Up(UpSender(aes_gcm)),
+        }
+    }
+}
+
+enum SendState<'a> {
+    Authenticating(AuthSender<'a>),
+    Up(UpSender<'a>),
+}
+
+struct AuthSender<'a> {
+    secret: &'a ReusableSecret,
+    key_store: &'a KeyStore,
+}
+
+impl<'a> AuthSender<'a> {
+    pub fn send(self, buf: &mut [u8]) -> &[u8] {
+        let pub_key: PublicKey = self.secret.into();
+        let pub_key = pub_key.as_bytes();
+        let (buf, _) = buf
+            .split_at_mut_checked(SIGNED_DATA_HEADER_SIZE + pub_key.len())
+            .unwrap();
+        let (header, data) = buf
+            .split_first_chunk_mut::<SIGNED_DATA_HEADER_SIZE>()
+            .unwrap();
+        self.key_store.sign(pub_key, header);
+        data.copy_from_slice(pub_key);
+        buf
+    }
+}
+
+struct UpSender<'a>(&'a mut Aes256Gcm);
+
+impl<'a> UpSender<'a> {
+    pub fn send(self, frame: LinkFrame) -> &[u8] {
+        let UpSender(secret) = self;
+        let LinkFrame { src, dst, hops, buf }  = frame;
+        Nonce::generate();
+        secret.encrypt_in_place_detached(nonce, Default::default(), buffer)
+        todo!()
+
     }
 }
 

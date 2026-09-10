@@ -1,11 +1,11 @@
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 
-const SIGNATURE_SIZE: usize = 64;
-const SIGNING_KEY_SIZE: usize = 64;
-const VERIFY_KEY_SIZE: usize = 32;
-const SIGNED_DATA_HEADER_SIZE: usize = 2 * SIGNATURE_SIZE + VERIFY_KEY_SIZE;
-const VERIFY_KEY_OFFSET: usize = SIGNATURE_SIZE;
-const DATA_SIG_OFFSET: usize = SIGNATURE_SIZE + VERIFY_KEY_SIZE;
+pub(crate) const SIGNATURE_SIZE: usize = 64;
+pub(crate) const SIGNING_KEY_SIZE: usize = 64;
+pub(crate) const VERIFY_KEY_SIZE: usize = 32;
+pub(crate) const SIGNED_DATA_HEADER_SIZE: usize = 2 * SIGNATURE_SIZE + VERIFY_KEY_SIZE;
+pub(crate) const VERIFY_KEY_OFFSET: usize = SIGNATURE_SIZE;
+pub(crate) const DATA_SIG_OFFSET: usize = SIGNATURE_SIZE + VERIFY_KEY_SIZE;
 
 pub struct KeyStore {
     pub key_pair: SigningKey,

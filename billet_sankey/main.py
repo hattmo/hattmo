@@ -67,8 +67,8 @@ def office_sort_key(code: str) -> tuple[str, int, str]:
     return (letter, len(code), code)
 
 
-def build_sankey(rows: list[tuple[str, str, str]]) -> dict:
-    """Build a tree-like visualization using Plotly treemap.
+def build_treemap(rows: list[tuple[str, str, str]]) -> dict:
+    """Build an Office → Workrole tree visualization using Plotly treemap.
 
     Hierarchy:
       root "Office"
@@ -158,7 +158,7 @@ def build_sankey(rows: list[tuple[str, str, str]]) -> dict:
         "layout": {
             "template": "plotly_white",
             "title": {
-                "text": "Office → Workrole Tree",
+                "text": "Office → Workrole Treemap",
                 "x": 0.5,
             },
             "font": {"size": 12},
@@ -212,20 +212,20 @@ def render_html(fig: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate an Office → Workrole tree from a CSV with Unit, Office, and Workrole columns.",
+        description="Generate an Office → Workrole treemap from a CSV with Unit, Office, and Workrole columns.",
     )
     parser.add_argument("csv_path", type=Path, help="Input CSV file")
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
-        default=Path("sankey.html"),
-        help="Output HTML file (default: sankey.html)",
+        default=Path("treemap.html"),
+        help="Output HTML file (default: treemap.html)",
     )
     args = parser.parse_args()
 
     rows = read_rows(args.csv_path)
-    fig = build_sankey(rows)
+    fig = build_treemap(rows)
     args.output.write_text(render_html(fig), encoding="utf-8")
 
     print(f"Wrote {args.output} from {len(rows)} row(s).", file=sys.stderr)

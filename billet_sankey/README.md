@@ -1,4 +1,4 @@
-# billet_sankey
+# billet_tree_map
 
 Generate a Sankey diagram from a CSV with these columns:
 
@@ -15,7 +15,7 @@ The diagram flows left-to-right:
 ## Usage
 
 ```bash
-python billet_sankey/main.py input.csv -o sankey.html
+python billet_tree_map/main.py input.csv -o treemap.html
 ```
 
 Open the generated `sankey.html` in a browser.

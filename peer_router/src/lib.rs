@@ -2,17 +2,16 @@
 
 extern crate core;
 
-use aes_gcm::Aes256Gcm;
 use ed25519_dalek::SignatureError;
 use x25519_dalek::EphemeralSecret;
 
 use rand_core::{CryptoRng, RngCore};
 
 use key_store::KeyStore;
-use link::{LinkHandle,LinkFrame};
+use link::{Link, LinkHandle};
 
-mod link;
 mod key_store;
+mod link;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct NodeId(u64);
@@ -35,10 +34,9 @@ impl Route {
     }
 }
 
-
 pub struct Router<T>
 where
-    T: CryptoRng + RngCore,
+    T: CryptoRng,
 {
     id: u64,
     keystore: KeyStore,
@@ -48,6 +46,7 @@ where
 }
 
 pub enum RouterError {
+    KeyStoreError,
     SignatureError(SignatureError),
 }
 
@@ -68,7 +67,7 @@ pub enum FrameDestination {
 
 impl<T> Router<T>
 where
-    T: CryptoRng + RngCore,
+    T: CryptoRng,
 {
     pub fn new(
         id: u64,
@@ -77,7 +76,7 @@ where
         ca: &[u8; 32],
         rng_source: T,
     ) -> Result<Self, RouterError> {
-        let keystore = KeyStore::new(key_pair, sig, ca)?;
+        let keystore = KeyStore::new(key_pair, sig, ca).or(Err(RouterError::KeyStoreError))?;
         Result::Ok(Self {
             id,
             keystore,
@@ -87,25 +86,21 @@ where
         })
     }
 
-    pub fn process_inbound<'a>(
+    pub fn process_inbound(
         &mut self,
         from_link: LinkHandle,
-        data: &'a mut [u8],
-    ) -> Result<(FrameDestination, &'a [u8]), ProcessError> {
+        data: &mut [u8],
+    ) -> Result<(FrameDestination, &[u8]), ProcessError> {
         let (_, state) = self
             .links
             .iter_mut()
             .flatten()
             .find(|(h, _)| h == &from_link)
             .ok_or(ProcessError)?;
-        let data = LinkFrame::process(data, state).or(Err(ProcessError))?;
-        match data {
-            LinkFrame::Data(data) => {
-                self.update_route_table(&data, from_link);
-                todo!()
-            }
-            LinkFrame::Authentication(authentication_packet) => todo!(),
-            LinkFrame::Control(control_packet) => todo!(),
+        match state.recieve(data) {
+            Ok(Some(frame)) => if frame.dst == self.id {},
+            Ok(None) => todo!(),
+            Err(_) => todo!(),
         }
     }
 

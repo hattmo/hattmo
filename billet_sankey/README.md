@@ -1,6 +1,6 @@
 # billet_tree_map
 
-Generate a Sankey diagram from a CSV with these columns:
+Generate a treemap from a CSV with these columns:
 
 - `Unit`
 - `Office`
@@ -18,4 +18,4 @@ The diagram flows left-to-right:
 python billet_tree_map/main.py input.csv -o treemap.html
 ```
 
-Open the generated `sankey.html` in a browser.
+Open the generated `treemap.html` in a browser.

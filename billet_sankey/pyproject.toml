@@ -1,7 +1,7 @@
 [project]
-name = "billet-sankey"
+name = "billet-tree-map"
 version = "0.1.0"
-description = "Add your description here"
+description = "Office → Workrole treemap"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []

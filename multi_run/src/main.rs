@@ -3,13 +3,7 @@ use libc::openpty;
 use ratatui::{DefaultTerminal, Frame};
 use serde::{Deserialize, Serialize};
 use std::{
-    ffi::OsStr,
-    io::{self, Write},
-    num::NonZero,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::{Arc, Mutex},
-    thread::available_parallelism,
+    ffi::OsStr, io::{self, Write}, num::NonZero, os::fd::{FromRawFd, OwnedFd}, path::{Path, PathBuf}, process::Command, sync::{Arc, Mutex}, thread::available_parallelism,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -107,15 +101,16 @@ fn run_command(
             std::ptr::null(),
         )
     };
-    let (mut pipe_read, pipe_write) = std::io::pipe()?;
+    let master = unsafe {OwnedFd::from_raw_fd(amaster)};
+    let slave = unsafe {OwnedFd::from_raw_fd(aslave)};
     println!("Running command on {user}@{host}");
     let mut child = Command::new("ssh")
         .arg(format!("{user}@{host}"))
         .args(command)
-        .stdout(pipe_write.try_clone()?)
-        .stderr(pipe_write)
+        .stdin(slave.try_clone()?)
+        .stdout(slave.try_clone()?)
+        .stderr(slave)
         .spawn()?;
-    io::copy(&mut pipe_read, &mut out)?;
     child.wait()?;
     Ok(())
 }

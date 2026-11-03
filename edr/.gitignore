@@ -1,2 +1,4 @@
-.cache
-build
+mkosi.output
+mkosi.pkgcache
+mkosi.cache
+

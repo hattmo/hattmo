@@ -1,9 +1,8 @@
 run: mkosi.out/edr_test_os
-	systemd-vmspawn --user --kvm=true --network-tap -x --image=./build/rootfs.raw --initrd=./build/initramfs.raw --linux=./vmlinuz-linux
+	systemd-vmspawn --user --kvm=true --network-tap -x --image=./mkosi.output/edr_test_os --initrd=./mkosi.output/initrd --linux=./mkosi.output/edr_test_os.vmlinuz
 
 mkosi.out/edr_test_os: mkosi.conf
-	mkosi -f mkosi.out
+	mkosi -f build
 
 clean:
-	rm -rf mkosi.out/*
 	mkosi -ff clean

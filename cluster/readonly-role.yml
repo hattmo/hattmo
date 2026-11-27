@@ -53,10 +53,10 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: hermes-agent
+  name: agent
 subjects:
   - kind: User
-    name: hermes-agent
+    name: agent
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole

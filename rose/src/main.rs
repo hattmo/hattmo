@@ -1,6 +1,3 @@
-#![feature(maybe_uninit_as_bytes)]
-#![feature(core_io_borrowed_buf)]
-#![feature(read_buf)]
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
@@ -27,7 +24,6 @@ use std::{
     env,
     process::Command,
     sync::mpsc::{Receiver, TryRecvError},
-    time::Duration,
 };
 use tracing::{info, info_span, instrument, level_filters::LevelFilter, subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
